@@ -18,7 +18,7 @@ def handlePacket(data, addr, delay):
 		elif addr == target:
 			sock.sendto(data, knownClient)
 
-if __name__ == '__main__':
+def gatherArgs():
 		parser = argparse.ArgumentParser(prog='pydur', description='delayed udp relay')
 		parser.add_argument('localport', help='local port to bind to', type=int)
 		parser.add_argument('remotehost', help='remote host to relay packets to')
@@ -27,7 +27,10 @@ if __name__ == '__main__':
 		parser.add_argument('-m', '--maxsize', help='max udp packet size', type=int, default=1024)
 		args = vars(parser.parse_args())
 		print(args)
-		print(clock())
+		return args
+
+if __name__ == '__main__':
+		args = gatherArgs()
 
 		target = ( args['remotehost'], args['remoteport'] )
 		sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
