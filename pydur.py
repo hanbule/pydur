@@ -7,18 +7,24 @@ knownClient = None
 target = None
 lastComm = None
 
+
 def handlePacket(data, addr, delay):
 		global knownClient
 		global target
+
 		if delay is not None:
 			sleep(delay)
+
 		if knownClient == None:
 			knownClient = addr
 			postMsg('knownClient={}'.format(addr))
+
 		if addr == knownClient:
 			sock.sendto(data, target)
 		elif addr == target:
 			sock.sendto(data, knownClient)
+		else:
+			postMsg('packet came from unknown source... dropping')
 
 def watchdog():
 	global lastComm
@@ -45,16 +51,66 @@ def gatherArgs():
 		postMsg('starting with: {}'.format(args))
 		return args
 
-if __name__ == '__main__':
-		args = gatherArgs()
 
-		target = ( args['remotehost'], args['remoteport'] )
-		sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		sock.bind(('0', args['localport']))
+class udpRelay:
 
-		Thread(target=watchdog, args=()).start()
+	def __init__(self):
+		self.args = gatherArgs()
+		self.knownClient = None
+		self.target = ( self.args['remotehost'], self.args['remoteport'] )
+		self.lastComm = None
 
+		self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		self.sock.bind(('0', self.args['localport']))
+
+		Thread(target=self.watchdog, args=()).start()
+
+		self.listenLoop()
+
+	def handlePacket(self, data, addr, delay):
+		if delay is not None:
+			sleep(delay)
+
+		if self.knownClient == None:
+			self.knownClient = addr
+			postMsg('knownClient={}'.format(addr))
+
+		if addr == self.knownClient:
+			self.sock.sendto(data, self.target)
+		elif addr == self.target:
+			self.sock.sendto(data, self.knownClient)
+		else:
+			postMsg('packet came from unknown source... dropping')
+
+	def watchdog(self):
 		while True:
-			data, addr = sock.recvfrom(args['maxsize'])
-			lastComm = time()
-			Thread(target=handlePacket, args=(data, addr, args['delay'])).start()
+			sleep(.250)
+			if self.lastComm is not None:
+				v = time() - self.lastComm
+				if v > 5 and self.knownClient is not None:
+					self.knownClient = None
+					postMsg('client reset')
+
+	def listenLoop(self):
+		while True:
+			data, addr = self.sock.recvfrom(self.args['maxsize'])
+			self.lastComm = time()
+			Thread(target=self.handlePacket, args=(data, addr, self.args['delay'])).start()
+
+
+
+if __name__ == '__main__':
+	relay = udpRelay()
+
+#		args = gatherArgs()
+#
+#		target = ( args['remotehost'], args['remoteport'] )
+#		sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#		sock.bind(('0', args['localport']))
+#
+#		Thread(target=watchdog, args=()).start()
+#
+#		while True:
+#			data, addr = sock.recvfrom(args['maxsize'])
+#			lastComm = time()
+#			Thread(target=handlePacket, args=(data, addr, args['delay'])).start()
